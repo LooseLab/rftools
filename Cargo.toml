@@ -4,11 +4,9 @@ version = "0.1.0"
 authors = ["Alex Payne <alexander.payne@nottingham.ac.uk>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-structopt = "0.3"
+clap = { version = "3.1.6", features = ["derive"] }
+# niffler = { version = "2.4.0", default-features = false, features = ["gz"] }
 needletail = { version = "0.4.1", features = ["compression"] }
-fst = "^0.4"
 csv = "1.1"
 fnv = "1.0.7"

@@ -1,34 +1,28 @@
-use structopt::StructOpt;
 mod cli;
-mod split;
-mod split_seq_sum;
-use crate::cli::Commands;
+mod split_fq;
+mod split_ss;
+use crate::cli::{Cli, Commands};
+use clap::Parser;
 
 fn main() {
+    // Better error handling, crate funcs should return
+    //   errors that can be propagated back here.
     // https://blog.burntsushi.net/rust-error-handling/
-    let args = Commands::from_args();
+    let args = Cli::parse();
 
     // let res = match args {
-    match args {
-        Commands::Split {
+    match args.command {
+        Commands::SplitFQ {
             unblocked_read_ids,
             prefix,
             input_fastq,
             write_unblocked,
-        } => crate::split::split(unblocked_read_ids, prefix, input_fastq, write_unblocked),
-        Commands::SplitSeqSum {
+        } => crate::split_fq::split(unblocked_read_ids, prefix, input_fastq, write_unblocked),
+        Commands::SplitSS {
             unblocked_read_ids,
+            prefix,
             sequencing_summary,
-        } => crate::split_seq_sum::split(unblocked_read_ids, sequencing_summary),
+        } => crate::split_ss::split(unblocked_read_ids, prefix, sequencing_summary),
+        _ => eprintln!("Not implemented, lol"),
     };
-    // match res {
-    //     Ok(()) => {
-    //         std::process::exit(0);
-    //     }
-    //     Err(err) => {
-    //         eprintln!("{}", err);
-    //         std::process::exit(1);
-    //     }
-    // }
 }
-

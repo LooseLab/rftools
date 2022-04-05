@@ -42,7 +42,7 @@ fn read_unblocked_read_ids(path: PathBuf) -> Result<FnvHashSet<String>, io::Erro
                 .collect();
             Ok(rejected_reads)
         }
-        Err(err) => Err(err)
+        Err(err) => Err(err),
     }
 }
 
