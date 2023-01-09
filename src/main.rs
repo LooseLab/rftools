@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 mod cli;
 mod split_fq;
 mod split_ss;
