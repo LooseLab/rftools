@@ -1,4 +1,6 @@
+mod _splitting;
 mod cli;
+mod split_bam;
 mod split_fq;
 mod split_ss;
 use crate::cli::{Cli, Commands};
@@ -23,6 +25,11 @@ fn main() {
             prefix,
             sequencing_summary,
         } => crate::split_ss::split(unblocked_read_ids, prefix, sequencing_summary),
-        _ => eprintln!("Not implemented, lol"),
+        Commands::SplitBam {
+            prefix,
+            unblocked_read_ids,
+            bam_file,
+            split_type,
+        } => crate::split_bam::split_bam(bam_file, unblocked_read_ids, prefix, split_type).unwrap(),
     };
 }

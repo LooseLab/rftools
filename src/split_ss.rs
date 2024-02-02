@@ -8,7 +8,7 @@ use std::{
 
 /// Read unblocked_read_ids.txt into a HashSet
 fn read_unblocked_read_ids(path: PathBuf) -> Result<FnvHashSet<String>, io::Error> {
-    match File::open(&path) {
+    match File::open(path) {
         Ok(file) => {
             let reader = BufReader::new(file);
             let rejected_reads: FnvHashSet<String> = reader
@@ -57,7 +57,7 @@ pub fn split(unblocked_read_ids: PathBuf, prefix: String, sequencing_summary: Pa
             std::process::exit(1);
         }
     };
-    let key_col = get_key_col(&rdr.byte_headers().expect("A")).expect("asdbf");
+    let key_col = get_key_col(rdr.byte_headers().expect("A")).expect("asdbf");
     let headers = &rdr.byte_headers().expect("a").clone();
     let mut wtr_s = csv::WriterBuilder::new()
         .delimiter(b'\t')
@@ -67,8 +67,8 @@ pub fn split(unblocked_read_ids: PathBuf, prefix: String, sequencing_summary: Pa
         .delimiter(b'\t')
         .from_path(unb_fn)
         .expect("unb wtr");
-    wtr_r.write_byte_record(&headers).expect("1");
-    wtr_s.write_byte_record(&headers).expect("2");
+    wtr_r.write_byte_record(headers).expect("1");
+    wtr_s.write_byte_record(headers).expect("2");
     let mut row = csv::ByteRecord::new();
     let mut s = 0;
     let mut r = 0;
