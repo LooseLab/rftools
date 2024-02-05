@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-use crate::_splitting::SplitType;
+use crate::_splitting::{EmitType, SplitType};
 
 #[derive(Debug, Parser)]
 #[clap(version, about = "Helper tools for after running readfish", long_about = None)]
@@ -51,17 +51,20 @@ pub enum Commands {
         #[clap(short, long, default_value = "")]
         /// Output file prefix
         prefix: String,
-
         #[clap(short, long, parse(from_os_str))]
-        /// Unblocked read ids from readfish
+        /// Unblocked read ids file from readfish
         unblocked_read_ids: PathBuf,
-
         #[clap(short, long, parse(from_os_str))]
-        /// sequencing_summary.txt file from MinKNOW
+        /// Bam file containing reads to be split.
         bam_file: PathBuf,
-        #[clap(short, long, default_value = "")]
-        /// Write rejected reads as well (default is false)
+        /// Write only sequenced reads, unblocked reads, or both. Default is sequenced only.
         #[clap(short, long, default_value_t, value_enum)]
         split_type: SplitType,
+        /// Average read quality threshold. If set, reads below this threshold will be filtered out.
+        #[clap(short, long)]
+        qual_thresh: Option<usize>,
+        /// Write out FASTQ rather than a BAM
+        #[clap(long, default_value_t, value_enum)]
+        emit_type: EmitType,
     },
 }

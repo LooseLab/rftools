@@ -30,6 +30,16 @@ fn main() {
             unblocked_read_ids,
             bam_file,
             split_type,
-        } => crate::split_bam::split_bam(bam_file, unblocked_read_ids, prefix, split_type).unwrap(),
+            qual_thresh,
+            emit_type,
+        } => crate::split_bam::split_bam(
+            bam_file,
+            unblocked_read_ids,
+            prefix,
+            split_type,
+            qual_thresh,
+            emit_type,
+        )
+        .unwrap(),
     };
 }
