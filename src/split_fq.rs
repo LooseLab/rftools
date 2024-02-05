@@ -54,17 +54,18 @@ pub fn split(
         unb_fn = format!("{}.unblocked.fastq", prefix);
     }
 
-    let mut sequenced_reads = match File::create(&seq_fn) {
+    let mut _sequenced_reads = match File::create(&seq_fn) {
         Ok(file) => file,
         Err(err) => {
             eprintln!("Could not create output file: {}\n{}", &seq_fn, err);
             std::process::exit(1)
         }
     };
-    let mut unblocked_reads: Option<File>;
+    let mut sequenced_reads: BufWriter<File> = BufWriter::new(_sequenced_reads);
+    let mut unblocked_reads: Option<BufWriter<File>>;
     if write_unblocked {
         unblocked_reads = match File::create(&unb_fn) {
-            Ok(file) => Some(file),
+            Ok(file) => Some(BufWriter::new(file)),
             Err(err) => {
                 eprintln!("Could not create output file: {}\n{}", &unb_fn, err);
                 std::process::exit(1)
