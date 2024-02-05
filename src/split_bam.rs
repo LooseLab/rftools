@@ -164,9 +164,9 @@ pub fn split_bam(
             valid_number_reads += 1;
 
             let read_id = readid.as_bytes();
-            if write_unblock
-                && unblocked_read_ids.contains(&String::from_utf8(read_id.to_vec()).unwrap())
-            {
+            let was_unblocked =
+                unblocked_read_ids.contains(&String::from_utf8(read_id.to_vec()).unwrap());
+            if write_unblock && was_unblocked {
                 match unblocked_reads_writer.as_mut().unwrap() {
                     Wrapper::Bam(unblocked_bam_writer) => {
                         unblocked_bam_writer
@@ -202,7 +202,8 @@ pub fn split_bam(
                         _ => unreachable!(),
                     },
                 }
-            } else if let Some(ref mut sequence_writer) = sequenced_reads_writer {
+            } else if sequenced_reads_writer.is_some() && !was_unblocked {
+                let sequence_writer = sequenced_reads_writer.as_mut().unwrap();
                 match sequence_writer {
                     Wrapper::Bam(sequenced_bam_writer) => {
                         sequenced_bam_writer
