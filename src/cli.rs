@@ -1,18 +1,23 @@
+//! Module for defining the command-line interface (CLI) using the `clap` crate.
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 use crate::_splitting::{EmitType, SplitType};
 
+/// Represents the command-line arguments for the application.
 #[derive(Debug, Parser)]
 #[clap(version, about = "Helper tools for after running readfish", long_about = None)]
 #[clap(propagate_version = true)]
 pub struct Cli {
+    /// The subcommand to execute.
     #[clap(subcommand)]
     pub command: Commands,
 }
 
+/// Represents the available commands for the application.
 #[derive(Debug, Subcommand)]
 pub enum Commands {
+    /// Command to split FASTQ into sequenced and unblocked reads.
     #[clap(about = "Split FASTQ into sequenced and unblocked")]
     SplitFQ {
         #[clap(short, long, default_value = "")]
