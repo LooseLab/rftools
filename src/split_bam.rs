@@ -122,7 +122,9 @@ fn write_fastq_record<W: Write>(
 /// * `prefix` - The output file prefix. If empty, default filenames will be used.
 /// * `split_type` - The type of reads to output: `All`, `SequencedOnly`, or `UnblockedOnly`.
 /// * `qual_thresh` - Optional quality threshold. If set, sequences below this average quality will be filtered out.
+/// * `length_thresh` - Optional minimum read length. If set, reads shorter than this will be filtered out.
 /// * `emit_type` - The type of file to write for split records: `Bam`, `Fastq`, or `Fasta`.
+/// * `compression` - The type of compression to use for FASTX output: `Gzipped`, `Uncompressed`
 ///
 /// # Returns
 ///
@@ -166,13 +168,15 @@ fn write_fastq_record<W: Write>(
 ///     Ok(_) => println!("BAM file successfully split into sequenced records with quality filtering."),
 ///     Err(e) => eprintln!("Error: {}", e),
 /// }
-/// ```
+/// ````
+#[allow(clippy::too_many_arguments)]
 pub fn split_bam(
     bam_file: PathBuf,
     unblocked_read_ids: PathBuf,
     prefix: String,
     split_type: SplitType,
     qual_thresh: Option<usize>,
+    length_thresh: Option<usize>,
     emit_type: EmitType,
     compression: CompressionType,
 ) -> Result<(), Error> {
@@ -330,7 +334,7 @@ pub fn split_bam(
         // Access the sequence bytes
 
         // Convert the sequence bytes to a string
-        if filter(&record, qual_thresh) {
+        if filter(&record, qual_thresh, length_thresh) {
             let read_id = readid.as_bytes();
             let was_unblocked =
                 unblocked_read_ids.contains(&String::from_utf8(read_id.to_vec()).unwrap());
@@ -481,16 +485,23 @@ pub fn split_bam(
 /// // Filter the record with a quality threshold of 35
 /// assert_eq!(filter(&record, Some(35)), false);
 /// ````
-fn filter(record: &bam::Record, qual: Option<usize>) -> bool {
+fn filter(record: &bam::Record, qual: Option<usize>, length_thresh: Option<usize>) -> bool {
     let x = if let Some(qual_thresh) = qual {
         let q = _ave_qual(record.quality_scores().as_ref());
         q > qual_thresh as f64
     } else {
         true
     };
+
+    let long_enough = if let Some(length_thresh) = length_thresh {
+        let l = record.sequence().len();
+        l > length_thresh
+    } else {
+        true
+    };
     let flags = record.flags();
 
-    x && !flags.is_supplementary() && !flags.is_secondary()
+    long_enough && x && !flags.is_supplementary() && !flags.is_secondary()
 }
 
 // #[cfg(test)]

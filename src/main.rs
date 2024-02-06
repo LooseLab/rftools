@@ -71,6 +71,7 @@ fn main() {
             bam_file,
             split_type,
             qual_thresh,
+            length_thresh,
             emit_type,
             compression,
         } => crate::split_bam::split_bam(
@@ -79,6 +80,7 @@ fn main() {
             prefix,
             split_type,
             qual_thresh,
+            length_thresh,
             emit_type,
             compression,
         )
