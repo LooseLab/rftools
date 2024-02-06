@@ -9,6 +9,7 @@ use std::{
 
 const SPACE: u8 = 32;
 const NEWLINE_SLICE: &[u8] = &[10];
+// https://play.rust-lang.org/?version=stable&mode=release&edition=2018&gist=9b6ce8097023be0ac3206abca036c35d
 
 /// Convert FASTX header line to an id by splitting on SPACE
 /// and converting to utf8. We don't check that all bytes are

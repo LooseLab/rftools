@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 //! # RfTools
 //!
 //! This is a simple, fast Rust project that implements simple parsing of ONT sequencing

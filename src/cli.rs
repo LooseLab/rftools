@@ -43,11 +43,11 @@ pub enum Commands {
         /// Output file prefix
         prefix: String,
 
-        #[clap(short, long, parse(from_os_str))]
+        #[clap(parse(from_os_str))]
         /// Unblocked read ids from readfish
         unblocked_read_ids: PathBuf,
 
-        #[clap(short, long, parse(from_os_str))]
+        #[clap(parse(from_os_str))]
         /// sequencing_summary.txt file from MinKNOW
         sequencing_summary: PathBuf,
     },
