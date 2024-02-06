@@ -68,6 +68,9 @@ pub enum Commands {
         /// Average read quality threshold. If set, reads below this threshold will be filtered out.
         #[clap(short, long)]
         qual_thresh: Option<usize>,
+        /// minimum length threshold - If set reads shorter than this threshold will be filtered out..
+        #[clap(short, long)]
+        length_thresh: Option<usize>,
         /// Write out FASTQ rather than a BAM
         #[clap(long, default_value_t, value_enum)]
         emit_type: EmitType,
