@@ -2,7 +2,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-use crate::_splitting::{EmitType, SplitType};
+use crate::_splitting::{CompressionType, EmitType, SplitType};
 
 /// Represents the command-line arguments for the application.
 #[derive(Debug, Parser)]
@@ -71,5 +71,8 @@ pub enum Commands {
         /// Write out FASTQ rather than a BAM
         #[clap(long, default_value_t, value_enum)]
         emit_type: EmitType,
+        /// Compression type for FASTX output.
+        #[clap(short, long, default_value_t, value_enum)]
+        compression: CompressionType,
     },
 }

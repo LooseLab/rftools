@@ -13,3 +13,4 @@ fnv = "1.0.7"
 indicatif = "0.17.7"
 noodles = { version = "0.62.0", features = ["bam", "sam", "csi"] }
 noodles-bgzf = { version = "0.26.0", features = ["libdeflate"] }
+flate2 = { version = "1.0.28", features = ["zlib-ng"] }

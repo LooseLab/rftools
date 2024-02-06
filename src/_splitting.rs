@@ -34,6 +34,7 @@
 //!     - `f64`: Average quality of the read.
 //!
 use clap::ValueEnum;
+use flate2::write::GzEncoder;
 use fnv::FnvHashSet;
 use noodles::bam;
 use noodles_bgzf as bgzf;
@@ -75,6 +76,20 @@ pub enum Wrapper {
     Bam(bam::io::Writer<bgzf::Writer<File>>),
     /// Wrapper for generic FASTX output.
     Fastx(BufWriter<File>),
+    /// Wrapper for a gzipped Fastx output
+    GzFastx(GzEncoder<BufWriter<File>>),
+}
+
+/// Enum for the compression type, currently only Gzipped or Uncompressed
+#[derive(Debug, ValueEnum, Clone, Default, PartialEq)]
+pub enum CompressionType {
+    /// Gzip files if they are FASTX
+    #[default]
+    Gzipped,
+    /// Bgzipped
+    Bgzipped,
+    /// Emit FASTQ files as output.
+    Uncompressed,
 }
 
 /// Read unblocked_read_ids.txt into a HashSet.

@@ -43,10 +43,13 @@
 //!
 //! The output files can be in BAM, FASTA, or FASTQ format, depending on the chosen `EmitType`.
 //!
-use crate::_splitting::{_ave_qual, read_unblocked_read_ids, EmitType, SplitType, Wrapper};
+use crate::_splitting::{
+    _ave_qual, read_unblocked_read_ids, CompressionType, EmitType, SplitType, Wrapper,
+};
+use flate2::{write::GzEncoder, Compression};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use noodles::{
-    bam::{self},
+    bam::{self, Record},
     sam::alignment::record::QualityScores,
 };
 use noodles_bgzf as bgzf;
@@ -61,6 +64,51 @@ use std::{
 const NEWLINE_SLICE: &[u8] = &[10];
 /// Minimum value for a Phred quality score WHAT A DUMB SYSTEm
 const MIN_VALUE: u8 = b'!';
+
+/// Write a Record to a Fasta file
+fn write_fasta_record<W: Write>(
+    record: &Record,
+    mut writer: W,
+    seq: &mut Vec<u8>,
+    read_id: &[u8],
+) -> Result<(), Error> {
+    *seq = record.sequence().iter().map(u8::from).collect();
+    writer.write_all(b">")?;
+    writer.write_all(read_id)?;
+    writer.write_all(NEWLINE_SLICE)?;
+    writer.write_all(seq)?;
+    writer.write_all(NEWLINE_SLICE)?;
+    Ok(())
+}
+
+/// write a record to a Fastq file
+fn write_fastq_record<W: Write>(
+    record: &Record,
+    mut writer: W,
+    seq: &mut Vec<u8>,
+    qual: &mut Vec<u8>,
+    read_id: &[u8],
+) -> Result<(), Error> {
+    *seq = record.sequence().iter().map(u8::from).collect();
+    *qual = record
+        .quality_scores()
+        .iter()
+        .map(|x| x + MIN_VALUE)
+        .collect();
+    writer.write_all(b"@")?;
+    writer.write_all(read_id)?;
+    writer.write_all(NEWLINE_SLICE)?;
+    writer.write_all(seq)?;
+    writer.write_all(NEWLINE_SLICE)?;
+    writer.write_all(b"+")?;
+    writer.write_all(NEWLINE_SLICE)?;
+    writer.write_all(qual)?;
+    writer.write_all(NEWLINE_SLICE)?;
+    Ok(())
+}
+
+/// Write a record to a Fasta file
+
 /// Split a BAM file into sequenced and unblocked records.
 ///
 /// This function takes a BAM file, a list of unblocked read IDs, and other parameters to split the input
@@ -126,6 +174,7 @@ pub fn split_bam(
     split_type: SplitType,
     qual_thresh: Option<usize>,
     emit_type: EmitType,
+    compression: CompressionType,
 ) -> Result<(), Error> {
     assert!(bam_file.exists());
     let file = File::open(bam_file)?;
@@ -136,7 +185,10 @@ pub fn split_bam(
     let mut bam_reader = bam::io::Reader::from(decoder);
     let _header = bam_reader.read_header()?;
     let unblocked_read_ids = read_unblocked_read_ids(unblocked_read_ids).unwrap();
-
+    let suffix = match compression {
+        CompressionType::Gzipped => ".gz",
+        _ => "",
+    };
     // Choose output file names
     let (seq_fn, unb_fn) = if prefix.is_empty() {
         match emit_type {
@@ -166,6 +218,10 @@ pub fn split_bam(
             ),
         }
     };
+    let (seq_fn, unb_fn) = (
+        format!("{}{}", seq_fn, suffix),
+        format!("{}{}", unb_fn, suffix),
+    );
     // Create outfile writers> first choose sequenecd, unblocked, both then emit type -> Fastx or BAM
     let (mut sequenced_reads_writer, mut unblocked_reads_writer) = match split_type {
         SplitType::All => {
@@ -195,10 +251,24 @@ pub fn split_bam(
                             std::process::exit(1)
                         }
                     };
-                    (
-                        Some(Wrapper::Fastx(_sequenced_reads)),
-                        Some(Wrapper::Fastx(unblocked_reads)),
-                    )
+                    match compression {
+                        CompressionType::Uncompressed => (
+                            Some(Wrapper::Fastx(_sequenced_reads)),
+                            Some(Wrapper::Fastx(unblocked_reads)),
+                        ),
+                        CompressionType::Gzipped => {
+                            let gz_seq = GzEncoder::new(_sequenced_reads, Compression::default());
+                            let gz_unb: GzEncoder<BufWriter<File>> =
+                                GzEncoder::new(unblocked_reads, Compression::default());
+                            (
+                                Some(Wrapper::GzFastx(gz_seq)),
+                                Some(Wrapper::GzFastx(gz_unb)),
+                            )
+                        }
+                        _ => {
+                            unimplemented!()
+                        }
+                    }
                 }
             }
         }
@@ -241,8 +311,8 @@ pub fn split_bam(
     };
     let mut record = noodles::bam::Record::default();
     let write_unblock = split_type != SplitType::SequencedOnly;
-    let mut seq: Vec<u8>;
-    let mut qual: Vec<u8>;
+    let mut seq: Vec<u8> = vec![];
+    let mut qual: Vec<u8> = vec![];
 
     // Setup progress bar
     let bar = ProgressBar::with_draw_target(None, ProgressDrawTarget::stdout())
@@ -273,29 +343,36 @@ pub fn split_bam(
                     }
                     Wrapper::Fastx(unblocked_fastx_writer) => match emit_type {
                         EmitType::Fasta => {
-                            seq = record.sequence().iter().map(u8::from).collect();
-                            unblocked_fastx_writer.write_all(b">")?;
-                            unblocked_fastx_writer.write_all(read_id)?;
-                            unblocked_fastx_writer.write_all(NEWLINE_SLICE)?;
-                            unblocked_fastx_writer.write_all(&seq)?;
-                            unblocked_fastx_writer.write_all(NEWLINE_SLICE)?;
+                            write_fasta_record(&record, unblocked_fastx_writer, &mut seq, read_id)?;
                         }
                         EmitType::Fastq => {
-                            seq = record.sequence().iter().map(u8::from).collect();
-                            qual = record
-                                .quality_scores()
-                                .iter()
-                                .map(|x| x + MIN_VALUE)
-                                .collect();
-                            unblocked_fastx_writer.write_all(b"@")?;
-                            unblocked_fastx_writer.write_all(read_id)?;
-                            unblocked_fastx_writer.write_all(NEWLINE_SLICE)?;
-                            unblocked_fastx_writer.write_all(&seq)?;
-                            unblocked_fastx_writer.write_all(NEWLINE_SLICE)?;
-                            unblocked_fastx_writer.write_all(b"+")?;
-                            unblocked_fastx_writer.write_all(NEWLINE_SLICE)?;
-                            unblocked_fastx_writer.write_all(&qual)?;
-                            unblocked_fastx_writer.write_all(NEWLINE_SLICE)?;
+                            write_fastq_record(
+                                &record,
+                                unblocked_fastx_writer,
+                                &mut seq,
+                                &mut qual,
+                                read_id,
+                            )?;
+                        }
+                        _ => unreachable!(),
+                    },
+                    Wrapper::GzFastx(unblocked_fastx_writer_gz) => match emit_type {
+                        EmitType::Fasta => {
+                            write_fasta_record(
+                                &record,
+                                unblocked_fastx_writer_gz,
+                                &mut seq,
+                                read_id,
+                            )?;
+                        }
+                        EmitType::Fastq => {
+                            write_fastq_record(
+                                &record,
+                                unblocked_fastx_writer_gz,
+                                &mut seq,
+                                &mut qual,
+                                read_id,
+                            )?;
                         }
                         _ => unreachable!(),
                     },
@@ -308,23 +385,41 @@ pub fn split_bam(
                             .write_record(&_header, &record)
                             .unwrap();
                     }
-                    Wrapper::Fastx(sequenced_fastx_writer) => {
-                        seq = record.sequence().iter().map(u8::from).collect();
-                        qual = record
-                            .quality_scores()
-                            .iter()
-                            .map(|x| x + MIN_VALUE)
-                            .collect();
-                        sequenced_fastx_writer.write_all(b"@")?;
-                        sequenced_fastx_writer.write_all(read_id)?;
-                        sequenced_fastx_writer.write_all(NEWLINE_SLICE)?;
-                        sequenced_fastx_writer.write_all(&seq)?;
-                        sequenced_fastx_writer.write_all(NEWLINE_SLICE)?;
-                        sequenced_fastx_writer.write_all(b"+")?;
-                        sequenced_fastx_writer.write_all(NEWLINE_SLICE)?;
-                        sequenced_fastx_writer.write_all(&qual)?;
-                        sequenced_fastx_writer.write_all(NEWLINE_SLICE)?;
-                    }
+                    Wrapper::Fastx(sequenced_fastx_writer) => match emit_type {
+                        EmitType::Fasta => {
+                            write_fasta_record(&record, sequenced_fastx_writer, &mut seq, read_id)?;
+                        }
+                        EmitType::Fastq => {
+                            write_fastq_record(
+                                &record,
+                                sequenced_fastx_writer,
+                                &mut seq,
+                                &mut qual,
+                                read_id,
+                            )?;
+                        }
+                        _ => unreachable!(),
+                    },
+                    Wrapper::GzFastx(sequenced_fastx_writer_gz) => match emit_type {
+                        EmitType::Fasta => {
+                            write_fasta_record(
+                                &record,
+                                sequenced_fastx_writer_gz,
+                                &mut seq,
+                                read_id,
+                            )?;
+                        }
+                        EmitType::Fastq => {
+                            write_fastq_record(
+                                &record,
+                                sequenced_fastx_writer_gz,
+                                &mut seq,
+                                &mut qual,
+                                read_id,
+                            )?;
+                        }
+                        _ => unreachable!(),
+                    },
                 }
             }
         }

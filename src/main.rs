@@ -71,6 +71,7 @@ fn main() {
             split_type,
             qual_thresh,
             emit_type,
+            compression,
         } => crate::split_bam::split_bam(
             bam_file,
             unblocked_read_ids,
@@ -78,6 +79,7 @@ fn main() {
             split_type,
             qual_thresh,
             emit_type,
+            compression,
         )
         .unwrap(),
     };
