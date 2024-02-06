@@ -1,10 +1,8 @@
-use fnv::FnvHashSet;
+use crate::_splitting::read_unblocked_read_ids;
 use needletail::parse_fastx_file;
 use std::{
     fs::File,
-    io,
-    io::Write,
-    io::{BufRead, BufReader},
+    io::{BufWriter, Write},
     path::PathBuf,
     str,
 };
@@ -26,24 +24,8 @@ const NEWLINE_SLICE: &[u8] = &[10];
 /// ```
 fn header_to_id(bytes: &[u8]) -> &str {
     match bytes.iter().position(|&char| char == SPACE) {
-        None => &str::from_utf8(&bytes).unwrap(),
-        Some(x) => &str::from_utf8(&bytes[..x]).unwrap(),
-    }
-}
-
-/// Read unblocked_read_ids.txt into a HashSet
-fn read_unblocked_read_ids(path: PathBuf) -> Result<FnvHashSet<String>, io::Error> {
-    // let file = File::open(&path);
-    match File::open(&path) {
-        Ok(file) => {
-            let reader = BufReader::new(file);
-            let rejected_reads: FnvHashSet<String> = reader
-                .lines()
-                .map(|l| l.expect("Couldn't read line"))
-                .collect();
-            Ok(rejected_reads)
-        }
-        Err(err) => Err(err),
+        None => str::from_utf8(bytes).unwrap(),
+        Some(x) => str::from_utf8(&bytes[..x]).unwrap(),
     }
 }
 
@@ -73,17 +55,18 @@ pub fn split(
         unb_fn = format!("{}.unblocked.fastq", prefix);
     }
 
-    let mut sequenced_reads = match File::create(&seq_fn) {
+    let mut _sequenced_reads = match File::create(&seq_fn) {
         Ok(file) => file,
         Err(err) => {
             eprintln!("Could not create output file: {}\n{}", &seq_fn, err);
             std::process::exit(1)
         }
     };
-    let mut unblocked_reads: Option<File>;
+    let mut sequenced_reads: BufWriter<File> = BufWriter::new(_sequenced_reads);
+    let mut unblocked_reads: Option<BufWriter<File>>;
     if write_unblocked {
         unblocked_reads = match File::create(&unb_fn) {
-            Ok(file) => Some(file),
+            Ok(file) => Some(BufWriter::new(file)),
             Err(err) => {
                 eprintln!("Could not create output file: {}\n{}", &unb_fn, err);
                 std::process::exit(1)
