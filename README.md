@@ -146,6 +146,10 @@ OPTIONS:
     -h, --help
             Print help information
 
+    -l, --length-thresh <LENGTH_THRESH>
+            minimum length threshold - If set reads shorter than this threshold will be filtered
+            out. [default: 0]
+
     -p, --prefix <PREFIX>
             Output file prefix [default: ]
 
