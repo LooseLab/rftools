@@ -331,13 +331,15 @@ pub fn split_bam(
 
     while bam_reader.read_record(&mut record).unwrap() != 0 {
         let readid = record.name().expect("missing read id on BAM record");
-        // Access the sequence bytes
-
-        // Convert the sequence bytes to a string
         if filter(&record, qual_thresh, length_thresh) {
             let read_id = readid.as_bytes();
-            let was_unblocked =
-                unblocked_read_ids.contains(&String::from_utf8(read_id.to_vec()).unwrap());
+            let was_unblocked = if let Some(Ok(_tag)) = record.data().get(b"dx") {
+                read_id
+                    .split(|b| b == &b';')
+                    .any(|b| unblocked_read_ids.contains(&String::from_utf8(b.to_vec()).unwrap()))
+            } else {
+                unblocked_read_ids.contains(&String::from_utf8(read_id.to_vec()).unwrap())
+            };
             if write_unblock && was_unblocked {
                 match unblocked_reads_writer.as_mut().unwrap() {
                     Wrapper::Bam(unblocked_bam_writer) => {
