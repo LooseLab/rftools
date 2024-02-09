@@ -473,9 +473,9 @@ dependencies = [
 
 [[package]]
 name = "noodles"
-version = "0.62.0"
+version = "0.62.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4db4b8fed8af2c156dc4622713e296350f4c87b4898f37811e4c7180cc8767e2"
+checksum = "976f894132b4a6a01e3577693f14dc3069c8d802b33b58ba46586ab1e4dd7bba"
 dependencies = [
  "noodles-bam",
  "noodles-csi",
@@ -484,9 +484,9 @@ dependencies = [
 
 [[package]]
 name = "noodles-bam"
-version = "0.54.0"
+version = "0.54.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cac62e3b127e29e7f8b9996e829c4c568548d1504251099a21e40256fd4a8224"
+checksum = "bc94309d51e454d7095e56c861f1c320c36cba2e0fc81c3ee7ed8459904ef20a"
 dependencies = [
  "bit-vec",
  "bstr",
@@ -621,7 +621,7 @@ dependencies = [
 
 [[package]]
 name = "rftools"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "clap",
  "csv",

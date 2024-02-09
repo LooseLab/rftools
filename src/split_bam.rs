@@ -50,7 +50,7 @@ use flate2::{write::GzEncoder, Compression};
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressStyle};
 use noodles::{
     bam::{self, Record},
-    sam::alignment::record::QualityScores,
+    sam::{alignment::record::QualityScores, Header},
 };
 use noodles_bgzf as bgzf;
 use std::{
@@ -105,6 +105,41 @@ fn write_fastq_record<W: Write>(
     writer.write_all(qual)?;
     writer.write_all(NEWLINE_SLICE)?;
     Ok(())
+}
+
+fn create_output_file(
+    fh: String,
+    emit_type: &EmitType,
+    compression: &CompressionType,
+    header: Option<&Header>,
+) -> Option<Wrapper> {
+    match emit_type {
+        EmitType::Bam => {
+            let mut bam: bam::io::Writer<bgzf::Writer<File>> =
+                bam::io::Writer::new(File::create(fh).expect("Failed to create file"));
+            bam.write_header(header.unwrap()).unwrap();
+            Some(Wrapper::Bam(bam))
+        }
+        _ => {
+            let out_file = match File::create(&fh) {
+                Ok(file) => BufWriter::new(file),
+                Err(err) => {
+                    eprintln!("Could not create output file: {}\n{}", &fh, err);
+                    std::process::exit(1)
+                }
+            };
+            match compression {
+                CompressionType::Uncompressed => Some(Wrapper::Fastx(out_file)),
+                CompressionType::Gzipped => {
+                    let gz_out = GzEncoder::new(out_file, Compression::default());
+                    Some(Wrapper::GzFastx(gz_out))
+                }
+                _ => {
+                    unimplemented!()
+                }
+            }
+        }
+    }
 }
 
 /// Write a record to a Fasta file
@@ -230,88 +265,20 @@ pub fn split_bam(
     let (mut sequenced_reads_writer, mut unblocked_reads_writer) = match split_type {
         SplitType::All => {
             // What are we emitting
-            match emit_type {
-                EmitType::Bam => {
-                    let mut sbam: bam::io::Writer<bgzf::Writer<File>> =
-                        bam::io::Writer::new(File::create(seq_fn).expect("Failed to create file"));
-                    let mut ubam =
-                        bam::io::Writer::new(File::create(unb_fn).expect("Failed to create file"));
-                    sbam.write_header(&_header).unwrap();
-                    ubam.write_header(&_header).unwrap();
-                    (Some(Wrapper::Bam(sbam)), Some(Wrapper::Bam(ubam)))
-                }
-                _ => {
-                    let mut _sequenced_reads = match File::create(&seq_fn) {
-                        Ok(file) => BufWriter::new(file),
-                        Err(err) => {
-                            eprintln!("Could not create output file: {}\n{}", &seq_fn, err);
-                            std::process::exit(1)
-                        }
-                    };
-                    let unblocked_reads = match File::create(&unb_fn) {
-                        Ok(file) => BufWriter::new(file),
-                        Err(err) => {
-                            eprintln!("Could not create output file: {}\n{}", &unb_fn, err);
-                            std::process::exit(1)
-                        }
-                    };
-                    match compression {
-                        CompressionType::Uncompressed => (
-                            Some(Wrapper::Fastx(_sequenced_reads)),
-                            Some(Wrapper::Fastx(unblocked_reads)),
-                        ),
-                        CompressionType::Gzipped => {
-                            let gz_seq = GzEncoder::new(_sequenced_reads, Compression::default());
-                            let gz_unb: GzEncoder<BufWriter<File>> =
-                                GzEncoder::new(unblocked_reads, Compression::default());
-                            (
-                                Some(Wrapper::GzFastx(gz_seq)),
-                                Some(Wrapper::GzFastx(gz_unb)),
-                            )
-                        }
-                        _ => {
-                            unimplemented!()
-                        }
-                    }
-                }
-            }
+            (
+                create_output_file(seq_fn, &emit_type, &compression, Some(&_header)),
+                create_output_file(unb_fn, &emit_type, &compression, Some(&_header)),
+            )
         }
-        SplitType::SequencedOnly => match emit_type {
-            EmitType::Bam => {
-                let mut sbam: bam::io::Writer<bgzf::Writer<File>> =
-                    bam::io::Writer::new(File::create(seq_fn).expect("Failed to create file"));
-                sbam.write_header(&_header).unwrap();
-                (Some(Wrapper::Bam(sbam)), None)
-            }
-            _ => {
-                let mut _sequenced_reads = match File::create(&seq_fn) {
-                    Ok(file) => BufWriter::new(file),
-                    Err(err) => {
-                        eprintln!("Could not create output file: {}\n{}", &seq_fn, err);
-                        std::process::exit(1)
-                    }
-                };
-                (Some(Wrapper::Fastx(_sequenced_reads)), None)
-            }
-        },
-        SplitType::UnblockedOnly => match emit_type {
-            EmitType::Bam => {
-                let mut ubam: bam::io::Writer<bgzf::Writer<File>> =
-                    bam::io::Writer::new(File::create(unb_fn).expect("Failed to create file"));
-                ubam.write_header(&_header).unwrap();
-                (None, Some(Wrapper::Bam(ubam)))
-            }
-            _ => {
-                let unblocked_reads = match File::create(&unb_fn) {
-                    Ok(file) => BufWriter::new(file),
-                    Err(err) => {
-                        eprintln!("Could not create output file: {}\n{}", &seq_fn, err);
-                        std::process::exit(1)
-                    }
-                };
-                (None, Some(Wrapper::Fastx(unblocked_reads)))
-            }
-        },
+        SplitType::SequencedOnly => (
+            create_output_file(seq_fn, &emit_type, &compression, Some(&_header)),
+            None,
+        ),
+
+        SplitType::UnblockedOnly => (
+            None,
+            create_output_file(unb_fn, &emit_type, &compression, Some(&_header)),
+        ),
     };
     let mut record = noodles::bam::Record::default();
     let write_unblock = split_type != SplitType::SequencedOnly;
@@ -331,13 +298,15 @@ pub fn split_bam(
 
     while bam_reader.read_record(&mut record).unwrap() != 0 {
         let readid = record.name().expect("missing read id on BAM record");
-        // Access the sequence bytes
-
-        // Convert the sequence bytes to a string
         if filter(&record, qual_thresh, length_thresh) {
             let read_id = readid.as_bytes();
-            let was_unblocked =
-                unblocked_read_ids.contains(&String::from_utf8(read_id.to_vec()).unwrap());
+            let was_unblocked = if let Some(Ok(_tag)) = record.data().get(b"dx") {
+                read_id
+                    .split(|b| b == &b';')
+                    .any(|b| unblocked_read_ids.contains(&String::from_utf8(b.to_vec()).unwrap()))
+            } else {
+                unblocked_read_ids.contains(&String::from_utf8(read_id.to_vec()).unwrap())
+            };
             if write_unblock && was_unblocked {
                 match unblocked_reads_writer.as_mut().unwrap() {
                     Wrapper::Bam(unblocked_bam_writer) => {
